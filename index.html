@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexusChat+ | Real-Time Chat</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root{--bg:#0b1020;--surface:#121a2d;--panel:#19243a;--border:#293650;--text:#f3f6ff;--muted:#91a0ba;--accent:#8b7cff;--accent2:#ff7892;--green:#35d6a1;--mine:#30285b;--other:#1b2940}
+*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
+button,input,textarea,select{font:inherit}button{cursor:pointer}
+#login{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:radial-gradient(circle at 20% 20%,#30285b 0,transparent 35%),var(--bg);padding:20px}
+.login-card{width:min(410px,100%);padding:34px;background:var(--surface);border:1px solid var(--border);border-radius:22px;box-shadow:0 24px 80px #0007}
+.logo{font-size:2rem;font-weight:850;letter-spacing:-1px;background:linear-gradient(120deg,var(--accent),var(--accent2));color:transparent;background-clip:text}
+.tagline{color:var(--muted);margin:5px 0 25px;font-size:.9rem}
+label{display:block;color:var(--muted);font-size:.78rem;margin:14px 0 7px}
+input,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:11px;background:var(--panel);color:var(--text);outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.primary{border:0;border-radius:11px;padding:12px 17px;color:white;font-weight:750;background:linear-gradient(120deg,var(--accent),var(--accent2))}
+#join{width:100%;margin-top:20px}
+#app{height:100vh;display:flex}.sidebar{width:245px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.brand{padding:22px 18px;font-weight:850;font-size:1.25rem;border-bottom:1px solid var(--border);background:linear-gradient(120deg,var(--accent),var(--accent2));color:transparent;background-clip:text}
+.section-title{padding:18px 17px 8px;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:1.4px}
+.room{margin:2px 9px;padding:11px;border-radius:9px;color:var(--muted);cursor:pointer;display:flex;gap:9px;align-items:center}
+.room:hover,.room.active{background:#8b7cff20;color:var(--text)}.room.active{outline:1px solid #8b7cff55}.room .hash{color:var(--accent);font-weight:800}
+.users{overflow:auto;flex:1;padding:0 9px}.user{padding:8px 9px;display:flex;align-items:center;gap:9px;font-size:.86rem}
+.avatar{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;color:white;font-size:.75rem;font-weight:800;flex-shrink:0}
+.you{margin-left:auto;color:var(--accent);font-size:.68rem}
+.me{border-top:1px solid var(--border);padding:14px;display:flex;align-items:center;gap:10px}.me small{display:block;color:var(--green);margin-top:3px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}.header{padding:15px 21px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.header strong{font-size:1rem}.online{margin-left:auto;color:var(--muted);font-size:.8rem}.header-actions{display:flex;gap:8px;margin-left:14px}
+.icon-btn{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+.toolbar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;background:#10182a}.toolbar input{padding:9px 12px;max-width:360px}.toolbar span{font-size:.78rem;color:var(--muted);align-self:center}
+.messages{flex:1;overflow:auto;padding:20px 22px;display:flex;flex-direction:column;gap:11px}.system{text-align:center;color:var(--muted);font-size:.75rem;padding:5px}
+.message{display:flex;gap:9px;align-items:flex-end;max-width:min(720px,85%)}.message.mine{align-self:flex-end;flex-direction:row-reverse}
+.bubble-wrap{min-width:0}.sender{font-size:.7rem;color:var(--muted);margin:0 3px 4px}.bubble{padding:10px 13px;border:1px solid var(--border);background:var(--other);border-radius:14px 14px 14px 4px;line-height:1.45;overflow-wrap:anywhere;white-space:pre-wrap}
+.mine .bubble{background:var(--mine);border-color:#8b7cff66;border-radius:14px 14px 4px 14px}.meta{font-size:.66rem;color:var(--muted);margin:4px 3px 0}
+.reactions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.reaction{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:20px;padding:3px 8px;font-size:.75rem}
+.reaction-picker{display:flex;gap:4px;margin-top:6px}.reaction-picker button{border:0;background:transparent;padding:2px;font-size:1rem}
+#typing{min-height:22px;padding:0 22px;color:var(--muted);font-size:.75rem}.composer{padding:13px 18px 17px;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:9px;align-items:flex-end}
+#message{resize:none;min-height:44px;max-height:120px;flex:1}#send{height:44px}.hidden{display:none!important}
+#toast{position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:#25334d;color:white;padding:10px 15px;border-radius:10px;display:none;z-index:30;font-size:.85rem}
+body.light{--bg:#eef2fb;--surface:#fff;--panel:#f2f5fb;--border:#dce3f0;--text:#182238;--muted:#65738c;--mine:#e8e2ff;--other:#fff}
+@media(max-width:700px){.sidebar{width:76px}.brand{font-size:.85rem;padding:20px 8px;text-align:center}.section-title{font-size:0;padding:12px 0}.room{justify-content:center;font-size:0;margin:3px 6px;padding:12px}.room .hash{font-size:1rem}.user{justify-content:center;padding:7px 0}.user .username,.you{display:none}.me{justify-content:center;padding:10px 4px}.me>div:last-child{display:none}.header{padding:12px}.toolbar{padding:9px}.messages{padding:15px 10px}.composer{padding:10px}.message{max-width:94%}.header-actions{margin-left:5px}}
+</style>
+</head>
+<body>
+<div id="login"><div class="login-card">
+  <div class="logo">NexusChat+</div><p class="tagline">Real conversations. Live connections.</p>
+  <label for="username">Choose a display name</label><input id="username" maxlength="20" placeholder="e.g. Alex" autocomplete="off">
+  <label for="room-choice">Choose your channel</label>
+  <select id="room-choice"><option value="general"># general</option><option value="random"># random</option><option value="tech"># tech</option></select>
+  <button class="primary" id="join">Join the conversation →</button>
+</div></div>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">NexusChat+</div><div class="section-title">Channels</div>
+    <div id="rooms">
+      <div class="room active" data-room="general"><span class="hash">#</span><span>general</span></div>
+      <div class="room" data-room="random"><span class="hash">#</span><span>random</span></div>
+      <div class="room" data-room="tech"><span class="hash">#</span><span>tech</span></div>
+    </div>
+    <div class="section-title">Online members · <span id="online-count">0</span></div>
+    <div class="users" id="users"></div>
+    <div class="me"><div class="avatar" id="my-avatar">?</div><div><b id="my-name">Guest</b><small>● Online</small></div></div>
+  </aside>
+  <main class="main">
+    <header class="header"><strong id="channel-title"># general</strong><span class="online" id="online-label">0 online</span>
+      <div class="header-actions"><button class="icon-btn" id="theme" title="Switch theme">☀️</button><button class="icon-btn" id="leave" title="Leave chat">↪</button></div>
+    </header>
+    <div class="toolbar"><input id="search" type="search" placeholder="Search messages in this channel…"><span id="search-count"></span></div>
+    <section class="messages" id="messages" aria-live="polite"></section>
+    <div id="typing"></div>
+    <form class="composer" id="composer"><textarea id="message" maxlength="500" rows="1" placeholder="Write a message… (Enter to send, Shift+Enter for a new line)"></textarea><button class="primary" id="send" type="submit">Send ➤</button></form>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const socket = io();
+let myName = "", myRoom = "general", typingTimer = null, typingActive = false;
+const typingNames = new Set();
+const messagesEl = $("messages"), messageInput = $("message");
+
+function toast(text) {
+  const el = $("toast"); el.textContent = text; el.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => el.style.display = "none", 2600);
+}
+function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+function timeLabel(ts) { return new Date(ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+function addSystem(text) {
+  const el = document.createElement("div"); el.className = "system";
+  el.textContent = `— ${text} —`; messagesEl.appendChild(el); scrollBottom();
+}
+function updateReactionDisplay(container, reactions) {
+  container.replaceChildren();
+  Object.entries(reactions || {}).forEach(([emoji, names]) => {
+    if (!names.length) return;
+    const button = document.createElement("button"); button.className = "reaction";
+    button.type = "button"; button.textContent = `${emoji} ${names.length}`;
+    button.title = names.join(", "); container.appendChild(button);
+  });
+}
+function renderMessage(msg) {
+  const row = document.createElement("article");
+  row.className = "message" + (msg.username === myName ? " mine" : "");
+  row.dataset.messageId = msg.id;
+  const avatar = document.createElement("div"); avatar.className = "avatar";
+  avatar.textContent = (msg.username || "?").charAt(0).toUpperCase();
+  avatar.style.background = msg.avatar || "#8b7cff";
+  const wrap = document.createElement("div"); wrap.className = "bubble-wrap";
+  const sender = document.createElement("div"); sender.className = "sender";
+  sender.textContent = msg.username === myName ? "You" : msg.username;
+  const bubble = document.createElement("div"); bubble.className = "bubble"; bubble.textContent = msg.text;
+  const meta = document.createElement("div"); meta.className = "meta"; meta.textContent = timeLabel(msg.timestamp);
+  const reactions = document.createElement("div"); reactions.className = "reactions";
+  const picker = document.createElement("div"); picker.className = "reaction-picker";
+  ["❤️","😂","👍","🎉","😮"].forEach(emoji => {
+    const button = document.createElement("button"); button.type = "button";
+    button.textContent = emoji; button.title = `React with ${emoji}`;
+    button.addEventListener("click", () => socket.emit("reaction", {messageId:msg.id, emoji}));
+    picker.appendChild(button);
+  });
+  wrap.append(sender, bubble, meta, reactions, picker); row.append(avatar, wrap);
+  updateReactionDisplay(reactions, msg.reactions || {});
+  messagesEl.appendChild(row); scrollBottom();
+}
+function renderHistory(messages) {
+  messagesEl.replaceChildren();
+  (Array.isArray(messages) ? messages : []).forEach(renderMessage);
+  applySearch();
+}
+function applySearch() {
+  const query = $("search").value.trim().toLowerCase(); let count = 0;
+  messagesEl.querySelectorAll(".message").forEach(row => {
+    const match = !query || row.textContent.toLowerCase().includes(query);
+    row.classList.toggle("hidden", !match); if (match) count++;
+  });
+  $("search-count").textContent = query ? `${count} match(es)` : "";
+}
+function updateUsers(users) {
+  $("online-count").textContent = users.length; $("online-label").textContent = `${users.length} online`;
+  const list = $("users"); list.replaceChildren();
+  users.forEach(user => {
+    const row = document.createElement("div"); row.className = "user";
+    const avatar = document.createElement("div"); avatar.className = "avatar";
+    avatar.textContent = user.username.charAt(0).toUpperCase(); avatar.style.background = user.avatar;
+    const name = document.createElement("span"); name.className = "username"; name.textContent = user.username;
+    row.append(avatar, name);
+    if (user.username === myName) { const you = document.createElement("span"); you.className = "you"; you.textContent = "you"; row.append(you); }
+    list.appendChild(row);
+  });
+}
+function setRoom(room) {
+  myRoom = room; $("channel-title").textContent = `# ${room}`;
+  document.querySelectorAll(".room").forEach(el => el.classList.toggle("active", el.dataset.room === room));
+  typingNames.clear(); renderTyping();
+}
+function renderTyping() {
+  const names = [...typingNames];
+  $("typing").textContent = names.length ? `${names.join(", ")} ${names.length === 1 ? "is" : "are"} typing…` : "";
+}
+function clearTyping() {
+  if (typingActive) socket.emit("typing", {isTyping:false});
+  typingActive = false; clearTimeout(typingTimer);
+}
+function sendMessage() {
+  const text = messageInput.value.trim(); if (!text || !myName) return;
+  socket.emit("chat_message", {text});
+  messageInput.value = ""; messageInput.style.height = "auto"; clearTyping();
+}
+
+$("join").addEventListener("click", () => {
+  const name = $("username").value.trim();
+  if (!name) { toast("Please enter your display name."); $("username").focus(); return; }
+  myName = name; socket.emit("join", {username:name, room:$("room-choice").value});
+});
+$("username").addEventListener("keydown", e => { if (e.key === "Enter") $("join").click(); });
+
+socket.on("joined", ({username, room, avatar}) => {
+  myName = username; setRoom(room); $("my-name").textContent = username;
+  $("my-avatar").textContent = username.charAt(0).toUpperCase(); $("my-avatar").style.background = avatar;
+  $("login").classList.add("hidden"); toast(`Welcome, ${username}!`);
+});
+socket.on("room_history", ({room, messages}) => { setRoom(room); renderHistory(messages); });
+socket.on("chat_message", msg => { renderMessage(msg); applySearch(); });
+socket.on("system_message", ({text}) => addSystem(text));
+socket.on("room_users", updateUsers);
+socket.on("room_switched", ({room}) => setRoom(room));
+socket.on("reaction_update", ({messageId, reactions}) => {
+  const row = [...messagesEl.querySelectorAll(".message")].find(el => el.dataset.messageId === messageId);
+  if (row) updateReactionDisplay(row.querySelector(".reactions"), reactions);
+});
+socket.on("typing", ({username, isTyping}) => {
+  if (username === myName) return;
+  if (isTyping) typingNames.add(username); else typingNames.delete(username);
+  renderTyping();
+});
+socket.on("app_error", toast);
+
+$("composer").addEventListener("submit", e => { e.preventDefault(); sendMessage(); });
+messageInput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+messageInput.addEventListener("input", () => {
+  messageInput.style.height = "auto"; messageInput.style.height = `${Math.min(messageInput.scrollHeight,120)}px`;
+  if (!typingActive) { typingActive = true; socket.emit("typing", {isTyping:true}); }
+  clearTimeout(typingTimer); typingTimer = setTimeout(clearTyping, 1300);
+});
+$("rooms").addEventListener("click", e => {
+  const roomEl = e.target.closest(".room");
+  if (!roomEl || !myName || roomEl.dataset.room === myRoom) return;
+  clearTyping(); socket.emit("switch_room", {room:roomEl.dataset.room});
+});
+$("search").addEventListener("input", applySearch);
+$("theme").addEventListener("click", () => {
+  document.body.classList.toggle("light");
+  $("theme").textContent = document.body.classList.contains("light") ? "🌙" : "☀️";
+});
+$("leave").addEventListener("click", () => {
+  socket.disconnect(); $("login").classList.remove("hidden");
+  toast("You left the chat. Refresh the page to reconnect.");
+});
+socket.on("disconnect", () => toast("Connection lost. Refresh the page to reconnect."));
+</script>
+</body>
+</html>
